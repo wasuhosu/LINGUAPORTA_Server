@@ -1,4 +1,4 @@
-// Google Apps Script (GAS) Code
+// Google Apps Script (GAS) Code - BACKUP
 // This script is assumed to be deployed as a web app.
 // It interacts with a Google Spreadsheet to store and retrieve data for the LINGUAPORTA extension.
 
@@ -8,6 +8,8 @@ const SPREADSHEET_ID = "YOUR_SPREADSHEET_ID";
 
 // Sheet names
 const DB_SHEET_NAME = "QuestionDB";
+const PORTFOLIO_SHEET_NAME = "PortfolioLog";
+const RESULT_SHEET_NAME = "ResultLog";
 
 /**
  * Handles POST requests from the Chrome extension's background script.
@@ -27,6 +29,12 @@ function doPost(e) {
         break;
       case "set":
         response = handleSetRequest(payload);
+        break;
+      case "portfolio_record":
+        response = handlePortfolioRecord(payload);
+        break;
+      case "result_setting_record":
+        response = handleResultRecord(payload);
         break;
       default:
         response = { status: "error", message: "Invalid request_type" };
@@ -122,6 +130,61 @@ function handleSetRequest(payload) {
   return { status: "success", message: `${rowsToAdd.length} new questions added.` };
 }
 
+/**
+ * Handles recording portfolio (learning summary) data.
+ * @param {Object} payload - The request payload.
+ * @returns {Object} - The response object.
+ */
+function handlePortfolioRecord(payload) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(PORTFOLIO_SHEET_NAME);
+  if (!sheet) {
+    return { status: "error", message: `Sheet "${PORTFOLIO_SHEET_NAME}" not found.` };
+  }
 
+  const newRow = [
+    new Date(), // timestamp
+    payload.id,
+    payload.score,
+    payload.rank,
+    payload.challenge_times,
+    payload.learning_time
+  ];
+  sheet.appendRow(newRow);
 
+  return { status: "success", message: "Portfolio recorded." };
+}
 
+/**
+ * Handles recording result/setting data for analytics.
+ * @param {Object} payload - The request payload.
+ * @returns {Object} - The response object.
+ */
+function handleResultRecord(payload) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(RESULT_SHEET_NAME);
+  if (!sheet) {
+    return { status: "error", message: `Sheet "${RESULT_SHEET_NAME}" not found.` };
+  }
+
+  const newRow = [
+    new Date(), // timestamp
+    payload.id,
+    payload.version,
+    payload.set_score,
+    payload.set_late,
+    payload.set_wrong_question,
+    payload.set_run_unit,
+    payload.run_unit,
+    payload.run_question_number,
+    payload.get_score,
+    payload.incorrect_answer_times,
+    payload.duration,
+    payload.browser,
+    payload.os,
+    payload.screen_width,
+    payload.screen_height,
+    payload.user_agent
+  ];
+  sheet.appendRow(newRow);
+
+  return { status: "success", message: "Result recorded." };
+}
