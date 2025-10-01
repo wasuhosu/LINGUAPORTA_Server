@@ -102,7 +102,6 @@ function handleSetRequest(payload) {
       // Assuming the order of columns in the sheet matches the object properties
       const newRow = [
         new Date(), // timestamp
-        payload.id, // user_id
         item.question_number,
         item.question_type,
         item.question_answer_1,
