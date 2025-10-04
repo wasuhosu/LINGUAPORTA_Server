@@ -48,43 +48,37 @@ function doPost(e) {
  */
 function handleGetRequest(payload) {
   const questionNumbers = payload.question_number;
-  const questionTypes = payload.question_type;
-  if (!questionNumbers || !Array.isArray(questionNumbers) || !questionTypes || !Array.isArray(questionTypes) || questionNumbers.length !== questionTypes.length) {
-    return { status: "error", message: "Invalid or missing question_number/question_type array or length mismatch" };
+  const questionType = payload.question_type; // 配列から単一の文字列に変更
+  if (!questionNumbers || !Array.isArray(questionNumbers) || !questionType || typeof questionType !== 'string') {
+    return { status: "error", message: "Invalid or missing question_number array or question_type string" };
   }
 
-  const wordMeaningSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(WORD_MEANING_SHEET_NAME);
-  const fillBlankSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(FILL_BLANK_SHEET_NAME);
-  if (!wordMeaningSheet || !fillBlankSheet) {
-    return { status: "error", message: "Required sheets not found. Please create sheets: '単語の意味' and '空所補充'" };
+  const sheetName = questionType === "単語の意味" ? WORD_MEANING_SHEET_NAME : FILL_BLANK_SHEET_NAME;
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
+  if (!sheet) {
+    return { status: "error", message: `Sheet '${sheetName}' not found.` };
   }
 
   const results = [];
-  for (let i = 0; i < questionNumbers.length; i++) {
-    const questionNum = questionNumbers[i];
-    const questionType = questionTypes[i];
-    const rowIndex = questionNum + 1;
-    try {
-      if (questionType === "単語の意味") {
-        const range = wordMeaningSheet.getRange(rowIndex, 1, 1, 4);
-        const rowData = range.getValues()[0];
-        if (rowData[1] === questionNum) {
-          results.push(rowData);
-        }
-      } else if (questionType === "空所補充") {
-        const range = fillBlankSheet.getRange(rowIndex, 1, 1, 4);
-        const rowData = range.getValues()[0];
-        if (rowData[1] === questionNum) {
-          results.push(rowData);
-        }
-      } else {
-        // 無効なタイプはスキップ
-        console.log(`Skipped question ${questionNum} with type "${questionType}" - invalid type`);
-      }
-    } catch (error) {
-      console.log(`Error retrieving question ${questionNum} with type ${questionType}: ${error.message}`);
+  const data = sheet.getDataRange().getValues(); // シート全体のデータを一度に取得
+
+  // 問題番号をキーにしたデータマップを作成
+  const dataMap = new Map();
+  for (let i = 1; i < data.length; i++) { // 1行目はヘッダーなのでスキップ
+    const row = data[i];
+    const qNum = row[1]; // B列が問題番号
+    if (qNum) {
+      dataMap.set(qNum, row);
     }
   }
+
+  // リクエストされた問題番号のデータを効率的に検索
+  questionNumbers.forEach(questionNum => {
+    if (dataMap.has(questionNum)) {
+      results.push(dataMap.get(questionNum));
+    }
+  });
+
   return { status: "success", content: results };
 }
 
