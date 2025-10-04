@@ -53,10 +53,19 @@ function handleGetRequest(payload) {
     return { status: "error", message: "Invalid or missing question_number array or question_type string" };
   }
 
-  const sheetName = questionType === "単語の意味" ? WORD_MEANING_SHEET_NAME : FILL_BLANK_SHEET_NAME;
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
-  if (!sheet) {
-    return { status: "error", message: `Sheet '${sheetName}' not found.` };
+  const wordMeaningSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(WORD_MEANING_SHEET_NAME);
+  const fillBlankSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(FILL_BLANK_SHEET_NAME);
+  if (!wordMeaningSheet || !fillBlankSheet) {
+    return { status: "error", message: "Required sheets not found. Please create sheets: '単語の意味' and '空所補充'" };
+  }
+
+  let sheet;
+  if (questionType === "単語の意味") {
+    sheet = wordMeaningSheet;
+  } else if (questionType === "空所補充") {
+    sheet = fillBlankSheet;
+  } else {
+    return { status: "error", message: `Invalid question_type: ${questionType}` };
   }
 
   const results = [];
@@ -75,7 +84,16 @@ function handleGetRequest(payload) {
   // リクエストされた問題番号のデータを効率的に検索
   questionNumbers.forEach(questionNum => {
     if (dataMap.has(questionNum)) {
-      results.push(dataMap.get(questionNum));
+      const row = dataMap.get(questionNum);
+      let formattedRow;
+      if (questionType === "単語の意味") {
+        // [questionNum, answer1, answer2, null, null, null]
+        formattedRow = [row[1], row[2], row[3], null, null, null];
+      } else { // 空所補充
+        // [questionNum, null, null, answer1, null, null]
+        formattedRow = [row[1], null, null, row[2], null, null];
+      }
+      results.push(formattedRow);
     }
   });
 
