@@ -4,7 +4,7 @@
 
 // --- Configuration ---
 // Replace with your Google Spreadsheet ID
-const SPREADSHEET_ID = "YOUR_SPREADSHEET_ID"; 
+const SPREADSHEET_ID = "<YOUR_SPREADSHEET_ID>"; 
 
 // Sheet names
 const WORD_MEANING_SHEET_NAME = "単語の意味";
@@ -48,55 +48,43 @@ function doPost(e) {
  */
 function handleGetRequest(payload) {
   const questionNumbers = payload.question_number;
-  if (!questionNumbers || !Array.isArray(questionNumbers)) {
-    return { status: "error", message: "Invalid or missing question_number array" };
+  const questionTypes = payload.question_type;
+  if (!questionNumbers || !Array.isArray(questionNumbers) || !questionTypes || !Array.isArray(questionTypes) || questionNumbers.length !== questionTypes.length) {
+    return { status: "error", message: "Invalid or missing question_number/question_type array or length mismatch" };
   }
 
-  // 両シートからデータを取得
   const wordMeaningSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(WORD_MEANING_SHEET_NAME);
   const fillBlankSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(FILL_BLANK_SHEET_NAME);
-  
   if (!wordMeaningSheet || !fillBlankSheet) {
     return { status: "error", message: "Required sheets not found. Please create sheets: '単語の意味' and '空所補充'" };
   }
 
   const results = [];
-  
-  // 各問題番号について対応するシートから固定行でデータを取得
-  for (const questionNum of questionNumbers) {
-    // 問題番号1-2600に対応する行番号（2行目から開始、1行目はヘッダー）
+  for (let i = 0; i < questionNumbers.length; i++) {
+    const questionNum = questionNumbers[i];
+    const questionType = questionTypes[i];
     const rowIndex = questionNum + 1;
-    
-    // 単語の意味シート（問題1-1300）
-    if (questionNum >= 1 && questionNum <= 1300) {
-      try {
-        const range = wordMeaningSheet.getRange(rowIndex, 1, 1, 7); // A列からG列まで
-        const rowData = range.getValues()[0];
-        // データが存在する場合のみ結果に追加（問題番号が一致する場合）
-        if (rowData[1] === questionNum) { // B列に問題番号が格納されている
-          results.push(rowData);
-        }
-      } catch (error) {
-        // 行が存在しない場合やエラーの場合はスキップ
-        console.log(`Error retrieving question ${questionNum} from word meaning sheet: ${error.message}`);
-      }
-    }
-    // 空所補充シート（問題1301-2600）
-    else if (questionNum >= 1301 && questionNum <= 2600) {
-      try {
-        // 空所補充の場合は問題番号から1300を引いた値を行番号として使用
-        const adjustedRowIndex = questionNum - 1300 + 1;
-        const range = fillBlankSheet.getRange(adjustedRowIndex, 1, 1, 7);
+    try {
+      if (questionType === "単語の意味") {
+        const range = wordMeaningSheet.getRange(rowIndex, 1, 1, 4);
         const rowData = range.getValues()[0];
         if (rowData[1] === questionNum) {
           results.push(rowData);
         }
-      } catch (error) {
-        console.log(`Error retrieving question ${questionNum} from fill blank sheet: ${error.message}`);
+      } else if (questionType === "空所補充") {
+        const range = fillBlankSheet.getRange(rowIndex, 1, 1, 4);
+        const rowData = range.getValues()[0];
+        if (rowData[1] === questionNum) {
+          results.push(rowData);
+        }
+      } else {
+        // 無効なタイプはスキップ
+        console.log(`Skipped question ${questionNum} with type "${questionType}" - invalid type`);
       }
+    } catch (error) {
+      console.log(`Error retrieving question ${questionNum} with type ${questionType}: ${error.message}`);
     }
   }
-
   return { status: "success", content: results };
 }
 
@@ -122,6 +110,7 @@ function handleSetRequest(payload) {
   
   content.forEach(item => {
     try {
+      Logger.log(item);
       const questionNum = item.question_number;
       const questionType = item.question_type;
       
@@ -141,7 +130,7 @@ function handleSetRequest(payload) {
         
         // データが存在しないか、問題番号が異なる場合のみ更新
         if (!existingQuestionNum || existingQuestionNum !== questionNum) {
-          wordMeaningSheet.getRange(rowIndex, 1, 1, 7).setValues([newRow]);
+          wordMeaningSheet.getRange(rowIndex, 1, 1, 4).setValues([newRow]);
           updatedCount++;
         }
       }
@@ -151,7 +140,7 @@ function handleSetRequest(payload) {
         const existingQuestionNum = fillBlankSheet.getRange(rowIndex, 2).getValue();
         
         if (!existingQuestionNum || existingQuestionNum !== questionNum) {
-          fillBlankSheet.getRange(rowIndex, 1, 1, 7).setValues([newRow]);
+          fillBlankSheet.getRange(rowIndex, 1, 1, 4).setValues([newRow]);
           updatedCount++;
         }
       }
